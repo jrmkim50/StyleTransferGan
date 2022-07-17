@@ -1,6 +1,6 @@
-Modified niftidataset to not be grayscale
 Modified generators.py to not output a tanh image
-Modified predictsingleimage.py to not output grayscale
+Added training statistics (min/max of training samples) to train.py
+Changed bounds of randomcrop and removed some augmentations in NiftiDataset.py
 
 If these changes don't work:
 revert to original repo and save the statistics

@@ -1056,7 +1056,7 @@ class RandomCrop(object):
             if Segmentation is False:
                 # threshold label into only ones and zero
                 threshold = sitk.BinaryThresholdImageFilter()
-                threshold.SetLowerThreshold(0.01)
+                threshold.SetLowerThreshold(1) # 0.01
                 threshold.SetUpperThreshold(255)
                 threshold.SetInsideValue(1)
                 threshold.SetOutsideValue(0)
