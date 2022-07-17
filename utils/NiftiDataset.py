@@ -376,13 +376,121 @@ def imadjust(image,gamma=np.random.uniform(1, 2)):
 # --------------------------------------------------------------------------------------
 
 
+# class NifitDataSet(torch.utils.data.Dataset):
+
+#     def __init__(self, data_list,
+#                  direction='image_to_label',
+#                  transforms=None,
+#                  train=False,
+#                  test=False, 
+#                  stats=[0,0]):
+
+#         # Init membership variables
+#         self.data_list = data_list
+#         self.direction = direction
+#         self.transforms = transforms
+#         self.train = train
+#         self.test = test
+#         self.stats = stats
+#         self.bit = sitk.sitkFloat32
+
+#         """
+#         the dataset class receive a list that contain the data item, and each item
+#         is a dict with two item include data path and label path. as follow:
+#         data_list = [
+#         {
+#         "data":　data_path_1,
+#         "label": label_path_1,
+#         },
+#         {
+#         "data": data_path_2,
+#         "label": label_path_2,
+#         }
+#         ...
+#         ]
+#         """
+
+#     def read_image(self, path):
+#         reader = sitk.ImageFileReader()
+#         reader.SetFileName(path)
+#         image = reader.Execute()
+#         return image
+
+#     def __getitem__(self, item):
+#         data_dict = self.data_list[item]
+#         data_path = data_dict["data"]
+#         label_path = data_dict["label"]
+
+
+#         if self.direction == 'image_to_label':
+
+#             data_path = data_path
+#             label_path = label_path
+
+#         else:
+
+#             label_path = data_path
+#             data_path = label_path
+
+#         # read image and label
+#         image = self.read_image(data_path)
+
+#         # image = Normalization(image)
+
+#         # cast image and label
+#         castImageFilter = sitk.CastImageFilter()
+#         castImageFilter.SetOutputPixelType(self.bit)
+#         image = castImageFilter.Execute(image)
+
+#         if self.train:
+#             label = self.read_image(label_path)
+#             castImageFilter.SetOutputPixelType(self.bit)
+#             label = castImageFilter.Execute(label)
+
+#         elif self.test:
+#             label = self.read_image(label_path)
+#             castImageFilter.SetOutputPixelType(self.bit)
+#             label = castImageFilter.Execute(label)
+
+#         else:
+#             label = sitk.Image(image.GetSize(), self.bit)
+#             label.SetOrigin(image.GetOrigin())
+#             label.SetSpacing(image.GetSpacing())
+
+#         sample = {'image': image, 'label': label}
+
+#         if self.transforms:  # apply the transforms to image and label (normalization, resampling, patches)
+#             for transform in self.transforms:
+#                 sample = transform(sample)
+
+#         # convert sample to tf tensors
+#         image_np = sitk.GetArrayFromImage(sample['image'])
+#         label_np = sitk.GetArrayFromImage(sample['label'])
+
+#         # to unify matrix dimension order between SimpleITK([x,y,z]) and numpy([z,y,x])  (actually it´s the contrary)
+#         image_np = np.transpose(image_np, (2, 1, 0))
+#         label_np = np.transpose(label_np, (2, 1, 0))
+        
+#         label_np = (label_np - self.stats[0]) / (self.stats[1] - self.stats[0])
+# #         label_np *= 255
+# #         label_np = (label_np - 127.5) / 127.5
+
+#         image_np = image_np[np.newaxis, :, :, :]
+#         label_np = label_np[np.newaxis, :, :, :]
+
+#         return torch.from_numpy(image_np), torch.from_numpy(label_np)  # this is the final output to feed the network
+
+#     def __len__(self):
+#         return len(self.data_list)
+
 class NifitDataSet(torch.utils.data.Dataset):
 
     def __init__(self, data_list,
                  direction='image_to_label',
                  transforms=None,
                  train=False,
-                 test=False,):
+                 test=False, 
+                 stats=None):
 
         # Init membership variables
         self.data_list = data_list
@@ -488,6 +596,16 @@ class NifitDataSet(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.data_list)
 
+
+# def Normalization(image):
+#     """
+#     Normalize an image to 0 mean, 1 std
+#     """
+#     normalizeFilter = sitk.NormalizeImageFilter()
+
+#     image = normalizeFilter.Execute(image)  # set mean and std deviation
+
+#     return image
 
 def Normalization(image):
     """
@@ -938,7 +1056,7 @@ class RandomCrop(object):
             if Segmentation is False:
                 # threshold label into only ones and zero
                 threshold = sitk.BinaryThresholdImageFilter()
-                threshold.SetLowerThreshold(1)
+                threshold.SetLowerThreshold(0.01)
                 threshold.SetUpperThreshold(255)
                 threshold.SetInsideValue(1)
                 threshold.SetOutsideValue(0)
@@ -980,8 +1098,7 @@ class Augmentation(object):
 
     def __call__(self, sample):
 
-        choice = np.random.choice([0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12])
-
+        choice = np.random.choice([0, 4, 5, 10, 11])
         # no augmentation
         if choice == 0:  # no augmentation
 

@@ -23,18 +23,20 @@ from collections import OrderedDict
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--multi_gpu', default=True, help='Multi or single Gpu')
-parser.add_argument('--gpu_ids', default='1', help='Select the GPU')
+parser.add_argument('--gpu_ids', default='4', help='Select the GPU')
 parser.add_argument("--image", type=str, default='./Data_folder/test/patient_5/image.nii')
 parser.add_argument("--label", type=str, default=None)
 parser.add_argument("--result", type=str, default='./Data_folder/test/patient_5/result.nii', help='path to the .nii result to save')
 parser.add_argument("--weights", type=str, default='./checkpoints/g_epoch_200.pth', help='generator weights to load')
 parser.add_argument("--resample", default=False, help='Decide or not to resample the images to a new resolution')
 parser.add_argument("--new_resolution", type=float, default=(0.625, 0.625, 1), help='New resolution')
-parser.add_argument("--patch_size", type=int, nargs=3, default=[128, 128, 64], help="Input dimension for the generator")
+parser.add_argument("--patch_size", type=int, nargs=3, default=[64, 64, 64], help="Input dimension for the generator")
 parser.add_argument("--batch_size", type=int, nargs=1, default=1, help="Batch size to feed the network (currently supports 1)")
 parser.add_argument("--stride_inplane", type=int, nargs=1, default=16, help="Stride size in 2D plane")
 parser.add_argument("--stride_layer", type=int, nargs=1, default=16, help="Stride size in z direction")
 args = parser.parse_args()
+
+train_stats = np.load("utils/train_stats.npy")
 
 def from_numpy_to_itk(image_np,image_itk):
     image_np = np.transpose(image_np, (2, 1, 0))
@@ -179,7 +181,7 @@ def inference(write_image, model, image_path, label_path, result_path, resample,
 
         for i in range(len(batches)):
             batch = batches[i]
-
+            
             batch = (batch - 127.5) / 127.5
 
             batch = torch.from_numpy(batch[np.newaxis, :, :, :])
@@ -202,7 +204,7 @@ def inference(write_image, model, image_path, label_path, result_path, resample,
 
         for i in tqdm(range(len(batches))):
             batch = batches[i]
-
+            
             batch = (batch - 127.5) / 127.5
 
             batch = torch.from_numpy(batch[np.newaxis, :, :, :])
@@ -236,6 +238,9 @@ def inference(write_image, model, image_path, label_path, result_path, resample,
 
     # removed all the padding
     label_np = label_np[:pad_x, :pad_y, :pad_z]
+    
+    # convert from 0-1 range to PET space
+    # label_np = label_np * (train_stats[1] - train_stats[0]) + train_stats[0]
 
     # convert back to sitk space
     label = from_numpy_to_itk(label_np, image_pre_pad)

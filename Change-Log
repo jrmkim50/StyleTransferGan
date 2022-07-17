@@ -1,0 +1,6 @@
+Modified niftidataset to not be grayscale
+Modified generators.py to not output a tanh image
+Modified predictsingleimage.py to not output grayscale
+
+If these changes don't work:
+revert to original repo and save the statistics

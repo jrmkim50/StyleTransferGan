@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 from init import Options
 from utils.utils import *
 from logger import *
+import nibabel as nib
 
 
 # -----  Loading the init options -----
@@ -35,6 +36,24 @@ for i in range(opt.increase_factor_data):  # augment the data list for training
     train_list.extend(train_list)
     val_list.extend(val_list)
 
+create_train_stats = False
+
+if create_train_stats:
+    train_labels = []
+    for folder in os.listdir(opt.data_path):
+        if not folder.startswith("patient"): 
+            continue
+        label_data = nib.load(os.path.join(opt.data_path, os.path.join(folder, "label.nii"))).get_fdata()
+        train_labels.append(label_data)
+    train_labels = np.array(train_labels)
+    mins = np.array([label.min() for label in train_labels])
+    maxs = np.array([label.max() for label in train_labels])
+    train_stats = np.array([mins.mean(), maxs.mean()])
+    np.save("utils/train_stats.npy", train_stats)
+else:
+    train_stats = np.load("utils/train_stats.npy")
+
+print('Train stats:', train_stats)    
 print('Number of training patches per epoch:', len(train_list))
 print('Number of validation patches per epoch:', len(val_list))
 # -------------------------------------
@@ -44,13 +63,12 @@ print('Number of validation patches per epoch:', len(val_list))
 
 # -----  Transformation and Augmentation process for the data  -----
 trainTransforms = [
-            NiftiDataset.Resample(opt.new_resolution, opt.resample),
             NiftiDataset.Augmentation(),
             NiftiDataset.Padding((opt.patch_size[0], opt.patch_size[1], opt.patch_size[2])),
             NiftiDataset.RandomCrop((opt.patch_size[0], opt.patch_size[1], opt.patch_size[2]), opt.drop_ratio, min_pixel),
             ]
 
-train_set = NifitDataSet(train_list, direction=opt.direction, transforms=trainTransforms, train=True)    # define the dataset and loader
+train_set = NifitDataSet(train_list, direction=opt.direction, transforms=trainTransforms, train=True, stats=train_stats)    # define the dataset and loader
 train_loader = DataLoader(train_set, batch_size=opt.batch_size, shuffle=True, num_workers=opt.workers)  # Here are then fed to the network with a defined batch size
 # -------------------------------------
 
@@ -163,12 +181,12 @@ for epoch in range(opt.epoch_count, opt.niter + opt.niter_decay + 1):
         generator_total_loss.backward()
         optim_generator.step()
 
-
         ######### Status and display #########
-        sys.stdout.write(
-            '\r [%d/%d][%d/%d] Discriminator_Loss: %.4f Generator_Loss: %.4f' % (
+        print (
+            "\r [%d/%d][%d/%d] Discriminator_Loss: %.4f Generator_Loss: %.4f" % (
                 epoch_count, (opt.niter + opt.niter_decay + 1), batch_idx, len(train_loader),
-                discriminator_loss, generator_total_loss))
+                discriminator_loss, generator_total_loss), 
+            end="")
 
     update_learning_rate(net_g_scheduler, optim_generator)
     update_learning_rate(net_d_scheduler, optim_discriminator)
@@ -181,7 +199,7 @@ for epoch in range(opt.epoch_count, opt.niter + opt.niter_decay + 1):
         NiftiDataset.RandomCrop((opt.patch_size[0], opt.patch_size[1], opt.patch_size[2]), opt.drop_ratio, min_pixel),
     ]
 
-    val_set = NifitDataSet(val_list, direction=opt.direction, transforms=valTransforms, test=True)
+    val_set = NifitDataSet(val_list, direction=opt.direction, transforms=valTransforms, test=True, stats=train_stats)
     val_loader = DataLoader(val_set, batch_size=opt.batch_size, shuffle=False, num_workers=opt.workers)
 
     plot_generated_batch(val_list=val_list, model=generator, resample=opt.resample, resolution=opt.new_resolution,
